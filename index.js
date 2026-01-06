@@ -4,4 +4,4 @@ const b = a.x
 
 console.log("b", b)
 
-console.log("c", c2)
+console.log("c", c3)
