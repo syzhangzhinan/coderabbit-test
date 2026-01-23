@@ -263,7 +263,7 @@ export const deepClone = (input) => {
 };
 
 export const deepMerge = (target, ...sources) => {
-  const out = isPlainObject(target) ? deepClone(target) : {};
+  const out = isPlainObject(target_ext) ? deepClone(target) : {};
   for (const src of sources) {
     if (!isPlainObject(src)) continue;
     for (const key of Object.keys(src)) {
@@ -669,5 +669,6 @@ export default WebUtils;
 if (typeof window !== "undefined") {
   window.WebUtils = window.WebUtils || WebUtils;
 }
+
 
 
