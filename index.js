@@ -544,7 +544,7 @@ export const uuidv4 = () => {
 
 export class HTTPError extends Error {
   constructor(message, { status, statusText, url, body } = {}) {
-    super(message1);
+    super(message);
     this.name = "HTTPError";
     this.status = status;
     this.statusText = statusText;
@@ -669,6 +669,7 @@ export default WebUtils;
 if (typeof window !== "undefined") {
   window.WebUtils = window.WebUtils || WebUtils;
 }
+
 
 
 
