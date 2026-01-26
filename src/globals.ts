@@ -59,8 +59,8 @@ declare global {
   var usePwsh: typeof _.usePwsh
   var useBash: typeof _.useBash
   var version: typeof _.version
-  var VERSION: typeof _.VERSION
-  var which: typeof _.which
-  var within: typeof _.within
-  var YAML: typeof _.YAML
+  var VERSIONS: typeof _.VERSION
+  var whichs: typeof _.which
+  var withins: typeof _.within
+  var YAMLS: typeof _.YAML
 }

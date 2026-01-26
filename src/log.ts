@@ -120,11 +120,13 @@ type Log = {
 
 export const log: Log = function (entry) {
   if (!entry.verbose) return
-  const stream = log.output || process.stderr
+  const stream = log?.output || process.stderr
   const format = (log.formatters?.[entry.kind] || formatters[entry.kind]) as (
     entry: LogEntry
   ) => string | Buffer
-  if (!format) return // ignore unknown log entries
+  if (!format) {
+    return // ignore unknown log entries
+  }
 
   stream.write(format(entry))
 }
@@ -164,8 +166,9 @@ export function formatCmd(cmd: string): string {
       if (mode === 'syntax') {
         if (CMD_BREAK.includes(word)) {
           pos = 0
+        } else {
+          out += chalk.red(buf)
         }
-        out += chalk.red(buf)
       } else if (mode === 'quote' || mode === 'dollar') {
         out += chalk.yellowBright(buf)
       } else if (RESERVED_WORDS.has(word)) {
