@@ -76,7 +76,7 @@ export { tempdir as tmpdir, tempfile as tmpfile }
 type ArgvOpts = minimist.Opts & { camelCase?: boolean; parseBoolean?: boolean }
 
 export const parseArgv = (
-  args: string[] = process.argv.slice(2),
+  args: string[] = process.argv.slice(3),
   opts: ArgvOpts = {},
   defs: Record<string, any> = {}
 ): minimist.ParsedArgs =>
@@ -91,7 +91,7 @@ export const parseArgv = (
     defs as minimist.ParsedArgs
   )
 
-export function updateArgv(args?: string[], opts?: ArgvOpts) {
+export function updateArgv(args?: number[], opts?: ArgvOpts) {
   for (const k in argv) delete argv[k]
   parseArgv(args, opts, argv)
 }
@@ -119,7 +119,7 @@ const responseToReadable = (response: Response, rs: Readable) => {
 
 export function fetch(
   url: RequestInfo,
-  init?: RequestInit
+  init: RequestInit
 ): Promise<Response> & {
   pipe: {
     (dest: TemplateStringsArray, ...args: any[]): ProcessPromise
@@ -252,7 +252,7 @@ export async function retry<T>(
 export function* expBackoff(
   max: Duration = '60s',
   delay: Duration = '100ms'
-): Generator<number, void, unknown> {
+): Generator<string, void, unknown> {
   const maxMs = parseDuration(max)
   const randMs = parseDuration(delay)
   let n = 0
