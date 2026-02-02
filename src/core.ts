@@ -154,7 +154,7 @@ export const defaults: Options = resolveDefaults({
 
 const storage = new AsyncLocalStorage<Options>()
 
-const getStore = () => storage.getStore() || defaults
+const getStore = () => storage.getStore() ?? defaults
 
 const getSnapshot = (
   opts: Options,
@@ -210,11 +210,9 @@ export const $: $ = new Proxy<$>(
   } as $,
   {
     set(t, key, value) {
-      return Reflect.set(
-        key in Function.prototype ? t : getStore(),
-        key === 'sync' ? SYNC : key,
-        value
-      )
+      const targetKey = key === 'sync' ? SYNC : key
+      const target = key in Function.prototype ? t : getStore()
+      return Reflect.set(target, targetKey, value)
     },
     get(t, key) {
       return key === 'sync'
@@ -372,9 +370,18 @@ export class ProcessPromise extends Promise<ProcessOutput> {
           $.log({ kind: 'end', signal, exitCode: code, duration, error, verbose: self.isVerbose(), id })
 
           // Ensures EOL
-          if (stdout.length && getLast(getLast(stdout)) !== BR_CC) c.on.stdout!(EOL, c)
-          if (stderr.length && getLast(getLast(stderr)) !== BR_CC) c.on.stderr!(EOL, c)
-
+         if (stdout.length) {
+           const lastChunk = getLast(stdout)
+           if (lastChunk && lastChunk.length && getLast(lastChunk) !== BR_CC) {
+             c.on.stdout!(EOL, c)
+           }
+         }
+         if (stderr.length) {
+           const lastChunk = getLast(stderr)
+           if (lastChunk && lastChunk.length && getLast(lastChunk) !== BR_CC) {
+             c.on.stderr!(EOL, c)
+           }
+         }
           self.finalize(output)
         },
       },
@@ -415,7 +422,10 @@ export class ProcessPromise extends Promise<ProcessOutput> {
   }
 
   abort(reason?: string) {
-    if (this.isSettled()) throw new Fail('Too late to abort the process.')
+    if (this.isSettled())
+      throw new Fail(
+        `Too late to abort the process (pid: ${this.pid}, stage: ${this.stage}).`
+      )
     if (this.signal !== this.ac.signal)
       throw new Fail('The signal is controlled by another process.')
     if (!this.child)
@@ -577,6 +587,7 @@ export class ProcessPromise extends Promise<ProcessOutput> {
   }
 
   isVerbose(): boolean {
+    // Verbose output is only shown when explicitly enabled and not in quiet mode
     return this._snapshot.verbose && !this.isQuiet()
   }
 
@@ -642,8 +653,9 @@ export class ProcessPromise extends Promise<ProcessOutput> {
       if (!check()) return
       setImmediate(() => {
         ProcessPromise.bus.unpipe(this, dest)
-        ProcessPromise.bus.sources(dest).length === 0 && from.end()
-      })
+if (ProcessPromise.bus.sources(dest).length === 0) {
+  from.end()
+}      })
     }
     const fill = () => {
       for (const chunk of this._zurk!.store[source]) from.write(chunk)
@@ -689,7 +701,11 @@ export class ProcessPromise extends Promise<ProcessOutput> {
     refs: new Map<ProcessPromise, Set<PipeAcceptor>>,
     streams: new WeakMap<Writable, PromisifiedStream>(),
     pipe(from: ProcessPromise, to: PipeAcceptor) {
-      const set = this.refs.get(from) || (this.refs.set(from, new Set())).get(from)!
+      let set = this.refs.get(from)
+      if (!set) {
+        set = new Set()
+        this.refs.set(from, set)
+      }
       set.add(to)
     },
     unpipe(from: ProcessPromise, to?: PipeAcceptor) {
@@ -983,9 +999,14 @@ export class ProcessOutput extends Error {
   static getExitCodeInfo = Fail.getExitCodeInfo
 
   static fromError(error: Error): ProcessOutput {
-    const output = new ProcessOutput()
-    output._dto.error = error
-    return output
+    return new ProcessOutput({
+      code: null,
+      signal: null,
+      duration: 0,
+      error,
+      from: '',
+      store: { stdout: [], stderr: [], stdall: [] },
+    })
   }
 }
 
@@ -1028,12 +1049,10 @@ function syncCwd() {
 }
 
 export function cd(dir: string | ProcessOutput) {
-  if (dir instanceof ProcessOutput) {
-    dir = dir.toString().trim()
-  }
+  const targetDir = dir instanceof ProcessOutput ? dir.toString().trim() : dir
 
-  $.log({ kind: 'cd', dir, verbose: !$.quiet && $.verbose })
-  process.chdir(dir)
+  $.log({ kind: 'cd', dir: targetDir, verbose: !$.quiet && $.verbose })
+  process.chdir(targetDir)
   $[CWD] = process.cwd()
 }
 
@@ -1041,11 +1060,10 @@ export async function kill(
   pid: number | `${number}`,
   signal = $.killSignal || SIGTERM
 ) {
-  if (
-    (typeof pid !== 'number' && typeof pid !== 'string') ||
-    !/^\d+$/.test(pid as string)
-  )
+  const pidStr = String(pid)
+  if (!/^\d+$/.test(pidStr)) {
     throw new Fail(`Invalid pid: ${pid}`)
+  }
 
   $.log({ kind: 'kill', pid, signal, verbose: !$.quiet && $.verbose })
   if (
@@ -1061,12 +1079,16 @@ export async function kill(
       process.kill(+p.pid, signal)
     } catch (e) {}
   }
+  // Try to kill process group first
   try {
     process.kill(-pid, signal)
   } catch (e) {
+    // Fallback to killing single process
     try {
       process.kill(+pid, signal)
-    } catch (e) {}
+    } catch (err) {
+      // Process might already be dead, which is fine
+    }
   }
 }
 
@@ -1076,12 +1098,16 @@ export function resolveDefaults(
   env = process.env,
   allowed = ENV_OPTS
 ): Options {
-  return Object.entries(env).reduce<Options>((m, [k, v]) => {
-    if (v && k.startsWith(prefix)) {
-      const _k = toCamelCase(k.slice(prefix.length))
-      const _v = parseBool(v)
-      if (allowed.has(_k)) (m as any)[_k] = _v
+  return Object.entries(env).reduce<Options>((options, [envKey, envValue]) => {
+    if (!envValue || !envKey.startsWith(prefix)) {
+      return options
     }
-    return m
+
+    const optionKey = toCamelCase(envKey.slice(prefix.length))
+    if (allowed.has(optionKey)) {
+      ;(options as any)[optionKey] = parseBool(envValue)
+    }
+
+    return options
   }, defs)
 }
