@@ -62,7 +62,7 @@ export function tempfile(
   mode?: Mode
 ): string {
   const filepath = name
-    ? path.join(tempdir(), name)
+    ? path.join(os.tmpdir(), `zx-${randomId()}`, name) // 一致使用随机目录
     : path.join(os.tmpdir(), `zx-${randomId()}`)
 
   if (data === undefined) fs.closeSync(fs.openSync(filepath, 'w', mode))
@@ -92,7 +92,7 @@ export const parseArgv = (
   )
 
 export function updateArgv(args?: string[], opts?: ArgvOpts) {
-  for (const k in argv) delete argv[k]
+  Object.keys(argv).forEach((k) => delete argv[k])
   parseArgv(args, opts, argv)
 }
 
@@ -111,8 +111,12 @@ const responseToReadable = (response: Response, rs: Readable) => {
     return rs
   }
   rs._read = async () => {
-    const result = await reader.read()
-    rs.push(result.done ? null : Buffer.from(result.value))
+    try {
+      const result = await reader.read()
+      rs.push(result.done ? null : Buffer.from(result.value))
+    } catch (err) {
+      rs.destroy(err)
+    }
   }
   return rs
 }
@@ -139,7 +143,10 @@ export function fetch(
           })(dest as TemplateStringsArray, ...args)
         : dest
       p.then(
-        (r) => responseToReadable(r, rs).pipe(_dest.run?.()),
+        (r) => {
+          const target = _dest.run?.()
+          if (target) responseToReadable(r, rs).pipe(target)
+        },
         (err) => _dest.abort?.(err)
       )
       return _dest
@@ -148,10 +155,25 @@ export function fetch(
 }
 
 export function echo(...args: any[]): void
+
 export function echo(pieces: TemplateStringsArray, ...args: any[]) {
+  // 提取为独立函数提高可读性
+  function formatTemplateString(
+    pieces: TemplateStringsArray,
+    args: any[]
+  ): string {
+    return (
+      args.map((a, i) => pieces[i] + stringify(a)).join('') + getLast(pieces)
+    )
+  }
+
+  function formatArgs(pieces: any, args: any[]): string {
+    return [pieces, ...args].map(stringify).join(' ')
+  }
+
   const msg = isStringLiteral(pieces, ...args)
-    ? args.map((a, i) => pieces[i] + stringify(a)).join('') + getLast(pieces)
-    : [pieces, ...args].map(stringify).join(' ')
+    ? formatTemplateString(pieces, args)
+    : formatArgs(pieces, args)
 
   console.log(msg)
 }
@@ -226,6 +248,7 @@ export async function retry<T>(
 
   let attempt = 0
   let lastErr: unknown
+  if (count <= 0) throw new Fail('Retry count must be greater than 0')
   while (count-- > 0) {
     attempt++
     try {
