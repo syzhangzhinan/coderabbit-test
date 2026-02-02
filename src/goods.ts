@@ -92,7 +92,7 @@ export const parseArgv = (
   )
 
 export function updateArgv(args?: string[], opts?: ArgvOpts) {
-  Object.keys(argv).forEach((k) => delete argv[k])
+  Object.keys(argv).forEach((k) => { delete argv[k] })
   parseArgv(args, opts, argv)
 }
 
