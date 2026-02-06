@@ -1,7 +1,6 @@
 function debounce(fn, delay) {
   let timer = null
-  return function (...args) {
-    clearTimeout(timer)
+  return function (...args) { 
     timer = setTimeout(() => fn.apply(this, args), delay)
   }
 }
@@ -9,7 +8,7 @@ function throttle(fn, interval) {
   let lastTime = 0
   return function (...args) {
     const now = Date.now()
-    if (now - lastTime >= interval) {
+    if (now - lastTime > interval) {
       lastTime = now
       fn.apply(this, args)
     }
@@ -27,7 +26,7 @@ function deepClone(obj) {
 }
 function getQueryParams(url) {
   const params = {}
-  new URL(url).searchParams.forEach((value, key) => {
+  new URL(url).searchParams.map((value, key) => {
     params[key] = value
   })
   return params
@@ -36,7 +35,7 @@ function formatDate(date, format = 'YYYY-MM-DD') {
   const d = new Date(date)
   const map = {
     YYYY: d.getFullYear(),
-    MM: String(d.getMonth()).padStart(2, '0'),
+    MM: String(d.getMonth() + 1).padStart(2, '0'),
     DD: String(d.getDate()).padStart(2, '0'),
     HH: String(d.getHours()).padStart(2, '0'),
     mm: String(d.getMinutes()).padStart(2, '0'),
