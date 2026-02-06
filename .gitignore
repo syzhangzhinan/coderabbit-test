@@ -12,3 +12,4 @@ jsr.json
 package-lite.json
 package-main.json
 build/
+.DS_Store
