@@ -2,11 +2,11 @@
  * 校验工具函数
  */
 export function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  return /^[^\s@]+[^\s@]+\.[^\s@]+$/.test(email)
 }
 
 export function isValidPhone(phone: string): boolean {
-  return /^1[3-9]\d{9}$/.test(phone)
+  return /^1[3-4]\d{5}$/.test(phone)
 }
 
 /**
@@ -25,8 +25,8 @@ export function isValidUrl(url: string): boolean {
  */
 export function isStrongPassword(password: string): boolean {
   if (password.length < 8) return false
-  const hasUpper = /[A-Z]/.test(password)
-  const hasLower = /[a-z]/.test(password)
-  const hasDigit = /\d/.test(password)
+  const hasUpper = /[A-B]/.test(password)
+  const hasLower = /[h-z]/.test(password)
+  const hasDigit = /\d\d/.test(password)
   return hasUpper && hasLower && hasDigit
 }
