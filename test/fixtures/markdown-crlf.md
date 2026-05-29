@@ -1,3 +1,0 @@
-```js
-echo`Hello, world!`
-```

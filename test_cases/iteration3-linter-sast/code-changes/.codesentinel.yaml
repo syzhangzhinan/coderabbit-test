@@ -1,0 +1,11 @@
+# 迭代三 Linter/SAST 集成测试用配置
+#
+# 放到仓库根目录后，ai-reviewer 在 Phase 0b 会读取此文件，决定启用哪些工具。
+tools:
+  eslint:
+    enabled: true
+    useProjectConfig: true # 使用 eslint.config.js
+  biome:
+    enabled: true
+  prettier:
+    enabled: false # 测试期间关闭，避免与 ESLint 风格规则信号重复

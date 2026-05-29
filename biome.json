@@ -1,0 +1,22 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.3.0/schema.json",
+  "files": {
+    "includes": ["utils/**/*.ts", "composables/**/*.ts"]
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "suspicious": {
+        "noDoubleEquals": "error",
+        "useIterableCallbackReturn": "error"
+      },
+      "correctness": {
+        "noUnusedVariables": "error"
+      }
+    }
+  },
+  "formatter": {
+    "enabled": false
+  }
+}
