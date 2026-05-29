@@ -69,6 +69,47 @@ describe('core', () => {
       assert.equal(defaults.input, undefined)
       assert.equal(defaults.foo, undefined)
     })
+
+    test('skips env vars with empty string value', () => {
+      const defs = resolveDefaults({ verbose: true }, 'ZX_', {
+        ZX_VERBOSE: '',
+      })
+      assert.equal(defs.verbose, true)
+    })
+
+    test('skips env vars without matching prefix', () => {
+      const defs = resolveDefaults({ verbose: false }, 'ZX_', {
+        OTHER_VERBOSE: 'true',
+        VERBOSE: 'true',
+      })
+      assert.equal(defs.verbose, false)
+    })
+
+    test('handles boolean string values correctly', () => {
+      const defs = resolveDefaults({ verbose: false, quiet: false }, 'ZX_', {
+        ZX_VERBOSE: '1',
+        ZX_QUIET: 'false',
+      })
+      assert.equal(defs.verbose, true)
+      assert.equal(defs.quiet, false)
+    })
+
+    test('returns the same defs object (mutates in place)', () => {
+      const base = { verbose: false }
+      const result = resolveDefaults(base, 'ZX_', { ZX_VERBOSE: 'true' })
+      assert.equal(result, base)
+      assert.equal(result.verbose, true)
+    })
+
+    test('regression: partial matches are correctly handled', () => {
+      const defs = resolveDefaults({ verbose: false, quiet: false }, 'ZX_', {
+        ZX_VERBOSE: 'true',
+        ZX_QUIET: '',
+        NOT_ZX_VERBOSE: 'false',
+      })
+      assert.equal(defs.verbose, true)
+      assert.equal(defs.quiet, false)
+    })
   })
 
   describe('$', () => {
@@ -1107,6 +1148,23 @@ describe('core', () => {
         assert.throws(() => p.abort(), /Too late to abort the process/)
       })
 
+      test('error message includes pid and stage when too late to abort', async () => {
+        const p = $`echo foo`
+        const pid = p.pid
+        await p
+
+        let err
+        try {
+          p.abort()
+        } catch (e) {
+          err = e
+        }
+        assert.ok(err, 'should have thrown')
+        assert.match(err.message, /Too late to abort the process/)
+        assert.match(err.message, new RegExp(`pid: ${pid}`))
+        assert.match(err.message, /stage: fulfilled/)
+      })
+
       test('abort signal is transmittable through pipe', async () => {
         const ac = new AbortController()
         const { signal } = ac
@@ -1553,6 +1611,63 @@ describe('core', () => {
         )
         assert.match(ProcessOutput.getErrorMessage({}, ''), /Unknown error/)
       })
+
+      describe('fromError()', () => {
+        test('returns a ProcessOutput instance', () => {
+          const err = new Error('test error')
+          const output = ProcessOutput.fromError(err)
+          assert.ok(output instanceof ProcessOutput)
+        })
+
+        test('sets exitCode to null', () => {
+          const output = ProcessOutput.fromError(new Error('oops'))
+          assert.equal(output.exitCode, null)
+        })
+
+        test('sets signal to null', () => {
+          const output = ProcessOutput.fromError(new Error('oops'))
+          assert.equal(output.signal, null)
+        })
+
+        test('sets duration to 0', () => {
+          const output = ProcessOutput.fromError(new Error('oops'))
+          assert.equal(output.duration, 0)
+        })
+
+        test('sets cause to the provided error', () => {
+          const err = new Error('root cause')
+          const output = ProcessOutput.fromError(err)
+          assert.equal(output.cause, err)
+        })
+
+        test('has empty stdout, stderr, stdall', () => {
+          const output = ProcessOutput.fromError(new Error('empty streams'))
+          assert.equal(output.stdout, '')
+          assert.equal(output.stderr, '')
+          assert.equal(output.stdall, '')
+        })
+
+        test('ok is false when error is present', () => {
+          const output = ProcessOutput.fromError(new Error('bad'))
+          assert.equal(output.ok, false)
+        })
+
+        test('message reflects the error', () => {
+          const err = new Error('something went wrong')
+          const output = ProcessOutput.fromError(err)
+          assert.match(output.message, /something went wrong/)
+        })
+
+        test('regression: does not share state between calls', () => {
+          const err1 = new Error('first')
+          const err2 = new Error('second')
+          const o1 = ProcessOutput.fromError(err1)
+          const o2 = ProcessOutput.fromError(err2)
+          assert.equal(o1.cause, err1)
+          assert.equal(o2.cause, err2)
+          assert.notEqual(o1.cause, o2.cause)
+        })
+      })
     })
   })
 
@@ -1641,6 +1756,26 @@ describe('core', () => {
         )
       })
     })
+
+    test('trims whitespace from ProcessOutput before cd', async () => {
+      await within(async () => {
+        // mktemp -d outputs path with trailing newline; cd must trim it
+        const tmp = await $`mktemp -d`
+        assert.ok(tmp.stdout.endsWith('\n'), 'mktemp stdout has trailing newline')
+        cd(tmp) // should not throw despite trailing newline
+        assert.equal(process.cwd(), tmp.stdout.trim())
+      })
+    })
+
+    test('accepts plain string path', async () => {
+      const cwd = process.cwd()
+      try {
+        cd('/tmp')
+        assert.ok(process.cwd().endsWith('/tmp') || process.cwd() === '/tmp')
+      } finally {
+        cd(cwd)
+      }
+    })
   })
 
   describe('kill()', () => {
@@ -1661,10 +1796,39 @@ describe('core', () => {
         /Invalid/
       )
     })
+
+    test('throws with message containing the invalid pid value', async () => {
+      let err
+      try {
+        await kill('not-a-pid')
+      } catch (e) {
+        err = e
+      }
+      assert.ok(err, 'should have thrown')
+      assert.match(err.message, /Invalid pid: not-a-pid/)
+    })
+
+    test('rejects undefined as invalid pid', async () => {
+      await assert.rejects(() => kill(undefined), /Invalid/)
+    })
+
+    test('rejects negative numbers as invalid pid', async () => {
+      await assert.rejects(() => kill(-1), /Invalid/)
+      await assert.rejects(() => kill(-100), /Invalid/)
+    })
+
+    test('rejects pid with leading/trailing spaces', async () => {
+      await assert.rejects(() => kill(' 123'), /Invalid/)
+      await assert.rejects(() => kill('123 '), /Invalid/)
+    })
+
+    test('rejects float string pid', async () => {
+      await assert.rejects(() => kill('1.5'), /Invalid/)
+    })
   })
 
   describe('within()', () => {
-    test('just works', async () => {
+
       let resolve, reject
       const promise = new Promise((...args) => ([resolve, reject] = args))
 
