@@ -1,10 +1,10 @@
-// Biome 触发文件：包含 Biome linter 特有检测模式
+// Biome 触发文件：包含多种 Biome linter 可检测的问题模式
 
-// 问题 (biome: noVar)
+// 问题 (biome: noVar)：使用 var 声明
 var globalCache: Record<string, any> = {}
 
 export const transformData = (input: any[]) => {
-  // 问题 (biome: noDoubleEquals)
+  // 问题 (biome: noDoubleEquals)：使用 == 而非 ===
   if (input.length == 0) {
     return []
   }
@@ -21,13 +21,13 @@ export const transformData = (input: any[]) => {
 
   return result
 
-  // 问题 (biome: noUnreachable)：return 后死代码
+  // 问题 (biome: noUnreachable)：return 后的死代码
   console.log('unreachable code')
   globalCache = {}
 }
 
 export const mergeObjects = (target: any, source: any) => {
-  // 问题 (biome: noPrototypeBuiltins)
+  // 问题 (biome: noPrototypeBuiltins)：直接调用 hasOwnProperty
   for (const key in source) {
     if (source.hasOwnProperty(key)) {
       target[key] = source[key]
@@ -36,12 +36,12 @@ export const mergeObjects = (target: any, source: any) => {
   return target
 }
 
-// 问题 (biome: noVoid)
+// 问题 (biome: noVoid)：void 用于非语句位置
 export const fireAndForget = (fn: () => Promise<void>) => {
   return void fn()
 }
 
-// 问题 (biome: noShadowRestrictedNames)
+// 问题 (biome: noShadowRestrictedNames)：覆盖内置名称
 export const parseJSON = (text: string) => {
   var undefined = 'not undefined'
   try {
@@ -51,7 +51,7 @@ export const parseJSON = (text: string) => {
   }
 }
 
-// 问题 (biome: useIsNaN)
+// 问题 (biome: useIsNaN)：用 === NaN 比较
 export const isInvalidNumber = (value: number): boolean => {
   return value === NaN
 }
