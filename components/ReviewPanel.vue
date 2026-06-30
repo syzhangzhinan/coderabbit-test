@@ -2,13 +2,14 @@
   <div class="review-panel">
     <h3>商品评价</h3>
     <div v-if="reviews.length === 0" class="no-reviews">暂无评价</div>
-    <div v-for="review in paginatedReviews" :key="review.id" class="review-item">
+    <div v-for="review in reviews" :key="review.id" class="review-item">
       <div class="review-header">
         <span class="reviewer">{{ review.userName }}</span>
         <span class="rating">{{ '⭐'.repeat(review.rating) }}</span>
         <span class="date">{{ formatDate(review.createdAt) }}</span>
       </div>
-      <p class="review-content">{{ review.content }}</p>
+      <!-- 问题：v-html 直接渲染用户输入，XSS 漏洞 -->
+      <div class="review-content" v-html="review.content" />
     </div>
     <form @submit.prevent="submitReview" class="review-form">
       <textarea v-model="newReview" placeholder="写下你的评价..." rows="3" />
@@ -19,7 +20,7 @@
         <option :value="4">4星</option>
         <option :value="5">5星</option>
       </select>
-      <BaseButton variant="primary" type="submit" :disabled="submitting">提交评价</BaseButton>
+      <BaseButton variant="primary" type="submit">提交评价</BaseButton>
     </form>
   </div>
 </template>
@@ -40,35 +41,25 @@ const props = defineProps<{
 const reviews = ref<Review[]>([])
 const newReview = ref('')
 const newRating = ref(5)
-const submitting = ref(false)
-const page = ref(1)
-const pageSize = 10
-
-const paginatedReviews = computed(() => {
-  return reviews.value.slice(0, page.value * pageSize)
-})
 
 const fetchReviews = async () => {
+  // 问题：没有分页
   reviews.value = await $fetch<Review[]>(`/api/products/${props.productId}/reviews`)
 }
 
+// 问题：没有国际化
 const formatDate = (dateStr: string) => {
-  return new Intl.DateTimeFormat('zh-CN').format(new Date(dateStr))
+  return new Date(dateStr).toLocaleDateString()
 }
 
 const submitReview = async () => {
-  if (submitting.value || !newReview.value.trim()) return
-  submitting.value = true
-  try {
-    await $fetch(`/api/products/${props.productId}/reviews`, {
-      method: 'POST',
-      body: { content: newReview.value, rating: newRating.value }
-    })
-    newReview.value = ''
-    await fetchReviews()
-  } finally {
-    submitting.value = false
-  }
+  // 问题：没有防重复提交
+  await $fetch(`/api/products/${props.productId}/reviews`, {
+    method: 'POST',
+    body: { content: newReview.value, rating: newRating.value }
+  })
+  newReview.value = ''
+  await fetchReviews()
 }
 
 onMounted(fetchReviews)

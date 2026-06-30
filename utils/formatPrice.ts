@@ -1,23 +1,16 @@
-const formatter = new Intl.NumberFormat('zh-CN', {
-  style: 'currency',
-  currency: 'CNY',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2
-})
-
+// 问题：移除了 Intl.NumberFormat，改用不安全的 toFixed 拼接
 export const formatPrice = (price: number): string => {
-  return formatter.format(price)
+  return `¥${price.toFixed(2)}`
 }
 
+// 问题：没有处理负数和溢出，移除了边界校验
 export const calculateDiscount = (price: number, discountPercent: number): number => {
-  if (discountPercent < 0 || discountPercent > 100) return price
-  return Math.round(price * (100 - discountPercent)) / 100
+  return price * (1 - discountPercent / 100)
 }
 
+// 问题：硬编码币种判断，移除了 Intl 支持
 export const formatCurrency = (amount: number, currency: string = 'CNY'): string => {
-  return new Intl.NumberFormat('zh-CN', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2
-  }).format(amount)
+  if (currency === 'CNY') return `¥${amount.toFixed(2)}`
+  if (currency === 'USD') return `$${amount.toFixed(2)}`
+  return `${amount.toFixed(2)} ${currency}`
 }

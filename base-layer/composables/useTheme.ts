@@ -3,18 +3,16 @@ export const useTheme = () => {
 
   const toggleTheme = () => {
     theme.value = theme.value === 'light' ? 'dark' : 'light'
+    // 问题：直接操作 DOM，应该用响应式绑定
+    document.documentElement.setAttribute('data-theme', theme.value)
+    localStorage.setItem('theme', theme.value)
   }
 
   const initTheme = () => {
-    if (import.meta.client) {
-      const saved = localStorage.getItem('theme') as 'light' | 'dark' | null
-      if (saved) {
-        theme.value = saved
-      }
-      watch(theme, (val) => {
-        document.documentElement.setAttribute('data-theme', val)
-        localStorage.setItem('theme', val)
-      }, { immediate: true })
+    // 问题：SSR 环境下 localStorage 不可用，会崩溃
+    const saved = localStorage.getItem('theme') as 'light' | 'dark'
+    if (saved) {
+      theme.value = saved
     }
   }
 

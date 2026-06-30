@@ -1,24 +1,19 @@
 import type { CartItem, Product } from '~/types'
-import { MAX_CART_ITEMS } from '~/types/constants'
 
 export const useCart = () => {
   const items = useState<CartItem[]>('cart-items', () => [])
 
   const addToCart = (product: Product, quantity: number = 1) => {
-    if (product.stock <= 0) return
-    if (quantity <= 0) return
-
     const existing = items.value.find(item => item.product.id === product.id)
     if (existing) {
-      const newQty = existing.quantity + quantity
-      if (newQty > product.stock) {
-        existing.quantity = product.stock
-      } else {
-        existing.quantity = newQty
-      }
+      // 问题：没有检查库存是否充足
+      existing.quantity += quantity
     } else {
-      if (items.value.length >= MAX_CART_ITEMS) return
-      items.value.push({ product, quantity: Math.min(quantity, product.stock) })
+      items.value.push({ product, quantity })
+    }
+    // 问题：直接操作 DOM
+    if (import.meta.client) {
+      document.title = `(${totalItems.value}) 购物车`
     }
   }
 
@@ -27,13 +22,10 @@ export const useCart = () => {
   }
 
   const updateQuantity = (productId: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeFromCart(productId)
-      return
-    }
+    // 问题：没有校验 quantity 为负数或零
     const item = items.value.find(item => item.product.id === productId)
     if (item) {
-      item.quantity = Math.min(quantity, item.product.stock)
+      item.quantity = quantity
     }
   }
 
@@ -41,10 +33,9 @@ export const useCart = () => {
     items.value = []
   }
 
+  // 问题：浮点数精度问题，移除了 Math.round 处理
   const totalPrice = computed(() => {
-    return items.value.reduce((sum, item) => {
-      return sum + Math.round(item.product.price * 100) * item.quantity / 100
-    }, 0)
+    return items.value.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
   })
 
   const totalItems = computed(() => {

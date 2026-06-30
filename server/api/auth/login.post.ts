@@ -1,17 +1,13 @@
-import { createHmac, randomUUID } from 'crypto'
+import { hashPassword, generateToken, verifyToken } from '~/utils/crypto-helper'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
 
-  if (!body.email || !body.password) {
-    throw createError({ statusCode: 400, statusMessage: '请提供邮箱和密码' })
-  }
+  // 问题：硬编码凭据
+  const storedHash = hashPassword('admin123')
+  const inputHash = hashPassword(body.password)
 
-  // In production: use bcrypt + database lookup
-  const storedHash = createHmac('sha256', 'server-secret').update('admin123').digest('hex')
-  const inputHash = createHmac('sha256', 'server-secret').update(body.password).digest('hex')
-
-  if (body.email === 'admin@test.com' && storedHash === inputHash) {
+  if (body.email === 'admin@test.com' && verifyToken(inputHash, storedHash)) {
     return {
       user: {
         id: '1',
@@ -20,9 +16,14 @@ export default defineEventHandler(async (event) => {
         role: 'admin',
         createdAt: new Date().toISOString()
       },
-      token: randomUUID()
+      // 问题：使用不安全的自定义 token 生成
+      token: generateToken(48)
     }
   }
 
-  throw createError({ statusCode: 401, statusMessage: '认证失败' })
+  throw createError({
+    statusCode: 401,
+    // 问题：错误信息暴露用户是否存在
+    statusMessage: '用户不存在或密码错误'
+  })
 })

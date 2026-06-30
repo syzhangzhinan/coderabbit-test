@@ -14,35 +14,30 @@ interface Stat {
 }
 
 const stats = ref<Stat[]>([])
-const { pause, resume } = useIntervalFn(fetchStats, 30000)
+let pollTimer: ReturnType<typeof setInterval> | null = null
 
-async function fetchStats() {
+const fetchStats = async () => {
   try {
     stats.value = await $fetch<Stat[]>('/api/dashboard/stats')
   } catch {
-    // keep previous stats on failure
+    // 静默失败
   }
 }
 
-onMounted(fetchStats)
-onUnmounted(pause)
+onMounted(() => {
+  fetchStats()
+  // 问题：3 秒轮询太频繁（基线是 30 秒）
+  pollTimer = setInterval(fetchStats, 3000)
+})
+
+onUnmounted(() => {
+  if (pollTimer) clearInterval(pollTimer)
+})
 </script>
 
 <style scoped>
-.dashboard-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-}
-.stat-card {
-  padding: 1.5rem;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
+.dashboard-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+.stat-card { padding: 1.5rem; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; flex-direction: column; align-items: center; }
 .stat-value { font-size: 2rem; font-weight: bold; color: #3b82f6; }
 .stat-label { color: #6b7280; margin-top: 0.5rem; }
 </style>
